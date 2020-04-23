@@ -20,7 +20,6 @@ class UnityInterop {
     enum class MessageName(val messageName: String) {
         VisibleHeightChanged("KB_HEIGHT_CHANGED"),
         InitDone("INIT_DONE"),
-        ViewCreated("VIEW_CREATED"),
         EnterPressed("ENTER_PRESSED"),
         TextChanged("TEXT_CHANGED")
     }
@@ -33,7 +32,7 @@ class UnityInterop {
         private var viewGroup: ViewGroup? = null
 
         private var heightChangeTracker: KeyboardHeightChangeTracker? = null
-        private var immManager: IMMManager? = null
+        private var inputReceiverView: InputReceiverView? = null
 
         private var debugMode = false
         val isDebugMode get() = debugMode
@@ -44,7 +43,7 @@ class UnityInterop {
             initInternal(includeNotchInHeight)
 
         private fun initInternal(includeNotchInHeight: Boolean): Boolean {
-            if (immManager != null)
+            if (inputReceiverView != null)
                 return true
 
             executePluginFunction {
@@ -55,7 +54,7 @@ class UnityInterop {
                         getFirstNonGroupView(rootView)!!.parent as ViewGroup
                 }
 
-                immManager = IMMManager(viewGroup!!)
+                inputReceiverView = InputReceiverView(viewGroup!!)
 
                 heightChangeTracker =
                     KeyboardHeightChangeTracker(
@@ -82,20 +81,20 @@ class UnityInterop {
         // interop method
         @JvmStatic
         fun destroy() {
-            val imm = immManager ?: return
+            val receiverView = inputReceiverView ?: return
 
             executePluginFunction {
                 heightChangeTracker!!.destroy()
                 heightChangeTracker = null
 
-                imm.destroy()
-                immManager = null
+                receiverView.destroy()
+                inputReceiverView = null
             }
         }
 
         // interop method
         @JvmStatic
-        fun getIMMManager() = immManager
+        fun getReceiverView() = inputReceiverView
 
         // interop method
         @JvmStatic

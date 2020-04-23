@@ -35,18 +35,6 @@ public class ImmInputField : Selectable,
     public delegate char OnValidateInput(string text, int charIndex, char addedChar);
     public delegate string ModifyDisplayedTextDelegate(string original);
 
-    [Serializable]
-    public class SubmitEvent : UnityEvent<string> { }
-
-    [Serializable]
-    public class OnChangeEvent : UnityEvent<string> { }
-
-    [Serializable]
-    public class SelectionEvent : UnityEvent<string> { }
-
-    [Serializable]
-    public class TextSelectionEvent : UnityEvent<string, int, int> { }
-
     public event ModifyDisplayedTextDelegate onModifyDisplayedText;
 
     protected NativeInputReceiver m_SoftKeyboard;
@@ -58,7 +46,7 @@ public class ImmInputField : Selectable,
     /// </summary>
 
     [SerializeField]
-    protected bool hideOnSubmit;
+    protected bool hideOnSubmit = true;
 
     [SerializeField]
     protected bool closeWithBackButton = true;
@@ -163,43 +151,43 @@ public class ImmInputField : Selectable,
     /// Event delegates triggered when the input field submits its data.
     /// </summary>
     [SerializeField]
-    private SubmitEvent m_OnEndEdit = new SubmitEvent();
+    private TMP_InputField.SubmitEvent m_OnEndEdit = new TMP_InputField.SubmitEvent();
 
     /// <summary>
     /// Event delegates triggered when the input field submits its data.
     /// </summary>
     [SerializeField]
-    private SubmitEvent m_OnSubmit = new SubmitEvent();
+    private TMP_InputField.SubmitEvent m_OnSubmit = new TMP_InputField.SubmitEvent();
 
     /// <summary>
     /// Event delegates triggered when the input field is focused.
     /// </summary>
     [SerializeField]
-    private SelectionEvent m_OnSelect = new SelectionEvent();
+    private TMP_InputField.SelectionEvent m_OnSelect = new TMP_InputField.SelectionEvent();
 
     /// <summary>
     /// Event delegates triggered when the input field focus is lost.
     /// </summary>
     [SerializeField]
-    private SelectionEvent m_OnDeselect = new SelectionEvent();
+    private TMP_InputField.SelectionEvent m_OnDeselect = new TMP_InputField.SelectionEvent();
 
     /// <summary>
     /// Event delegates triggered when the text is selected / highlighted.
     /// </summary>
     [SerializeField]
-    private TextSelectionEvent m_OnTextSelection = new TextSelectionEvent();
+    private TMP_InputField.TextSelectionEvent m_OnTextSelection = new TMP_InputField.TextSelectionEvent();
 
     /// <summary>
     /// Event delegates triggered when text is no longer select / highlighted.
     /// </summary>
     [SerializeField]
-    private TextSelectionEvent m_OnEndTextSelection = new TextSelectionEvent();
+    private TMP_InputField.TextSelectionEvent m_OnEndTextSelection = new TMP_InputField.TextSelectionEvent();
 
     /// <summary>
     /// Event delegates triggered when the input field changes its data.
     /// </summary>
     [SerializeField]
-    private OnChangeEvent m_OnValueChanged = new OnChangeEvent();
+    private TMP_InputField.OnChangeEvent m_OnValueChanged = new TMP_InputField.OnChangeEvent();
 
     /// <summary>
     /// Custom validation callback.
@@ -275,7 +263,6 @@ public class ImmInputField : Selectable,
     private bool m_IsScrollbarUpdateRequired = false;
     private bool m_IsUpdatingScrollbarValues = false;
 
-    private bool m_isLastKeyBackspace = false;
     private float m_PointerDownClickStartTime;
     private float m_KeyDownStartTime;
     private float m_DoubleClickDelay = 0.5f;
@@ -483,6 +470,11 @@ public class ImmInputField : Selectable,
         else if (m_StringSelectPosition > m_Text.Length)
             m_StringSelectPosition = m_Text.Length;
 
+        if (caretPositionInternal > m_Text.Length)
+            caretPositionInternal = caretSelectPositionInternal = m_Text.Length;
+        else if (caretSelectPositionInternal > m_Text.Length)
+            caretSelectPositionInternal = m_Text.Length;
+
         // Set RectTransform relative position to top of viewport.
         AdjustTextPositionRelativeToViewport(0);
 
@@ -560,19 +552,19 @@ public class ImmInputField : Selectable,
 
     public Color selectionColor { get { return m_SelectionColor; } set { if (SetPropertyUtility.SetColor(ref m_SelectionColor, value)) MarkGeometryAsDirty(); } }
 
-    public SubmitEvent onEndEdit { get { return m_OnEndEdit; } set { SetPropertyUtility.SetClass(ref m_OnEndEdit, value); } }
+    public TMP_InputField.SubmitEvent onEndEdit { get { return m_OnEndEdit; } set { SetPropertyUtility.SetClass(ref m_OnEndEdit, value); } }
 
-    public SubmitEvent onSubmit { get { return m_OnSubmit; } set { SetPropertyUtility.SetClass(ref m_OnSubmit, value); } }
+    public TMP_InputField.SubmitEvent onSubmit { get { return m_OnSubmit; } set { SetPropertyUtility.SetClass(ref m_OnSubmit, value); } }
 
-    public SelectionEvent onSelect { get { return m_OnSelect; } set { SetPropertyUtility.SetClass(ref m_OnSelect, value); } }
+    public TMP_InputField.SelectionEvent onSelect { get { return m_OnSelect; } set { SetPropertyUtility.SetClass(ref m_OnSelect, value); } }
 
-    public SelectionEvent onDeselect { get { return m_OnDeselect; } set { SetPropertyUtility.SetClass(ref m_OnDeselect, value); } }
+    public TMP_InputField.SelectionEvent onDeselect { get { return m_OnDeselect; } set { SetPropertyUtility.SetClass(ref m_OnDeselect, value); } }
 
-    public TextSelectionEvent onTextSelection { get { return m_OnTextSelection; } set { SetPropertyUtility.SetClass(ref m_OnTextSelection, value); } }
+    public TMP_InputField.TextSelectionEvent onTextSelection { get { return m_OnTextSelection; } set { SetPropertyUtility.SetClass(ref m_OnTextSelection, value); } }
 
-    public TextSelectionEvent onEndTextSelection { get { return m_OnEndTextSelection; } set { SetPropertyUtility.SetClass(ref m_OnEndTextSelection, value); } }
+    public TMP_InputField.TextSelectionEvent onEndTextSelection { get { return m_OnEndTextSelection; } set { SetPropertyUtility.SetClass(ref m_OnEndTextSelection, value); } }
 
-    public OnChangeEvent onValueChanged { get { return m_OnValueChanged; } set { SetPropertyUtility.SetClass(ref m_OnValueChanged, value); } }
+    public TMP_InputField.OnChangeEvent onValueChanged { get { return m_OnValueChanged; } set { SetPropertyUtility.SetClass(ref m_OnValueChanged, value); } }
 
     public OnValidateInput onValidateInput { get { return m_OnValidateInput; } set { SetPropertyUtility.SetClass(ref m_OnValidateInput, value); } }
 
@@ -999,15 +991,6 @@ public class ImmInputField : Selectable,
 
         base.OnDisable();
     }
-
-    protected override void Start()
-    {
-        base.Start();
-
-        if (keepFocus)
-            EventSystem.current.SetSelectedGameObject(gameObject);
-    }
-
 
     /// <summary>
     /// Method used to update the tracking of the caret position when the text object has been regenerated.
@@ -1853,7 +1836,8 @@ public class ImmInputField : Selectable,
     protected enum EditState
     {
         Continue,
-        Finish
+        Finish,
+        SubmitAndContinue
     }
 
     protected EditState KeyPressed(Event evt)
@@ -1991,8 +1975,13 @@ public class ImmInputField : Selectable,
                 {
                     if (lineType != TMP_InputField.LineType.MultiLineNewline)
                     {
-                        m_ReleaseSelection = true;
-                        return EditState.Finish;
+                        if (keepFocus)
+                            return EditState.SubmitAndContinue;
+                        else
+                        {
+                            m_ReleaseSelection = true;
+                            return EditState.Finish;
+                        }
                     }
                     break;
                 }
@@ -2049,6 +2038,8 @@ public class ImmInputField : Selectable,
     /// Handle the specified event.
     /// </summary>
     private Event m_ProcessingEvent = new Event();
+    private bool takeFocusAfterApplicationFocusRestored;
+    private bool takeFocusAfterApplicationResumed;
 
     public void ProcessEvent(Event e)
     {
@@ -2079,6 +2070,10 @@ public class ImmInputField : Selectable,
                     SendOnSubmit();
                     DeactivateInputField();
                     break;
+                }
+                else if (shouldContinue == EditState.SubmitAndContinue)
+                {
+                    SendOnSubmit();
                 }
             }
 
@@ -2844,8 +2839,6 @@ public class ImmInputField : Selectable,
 
                     caretSelectPositionInternal = caretPositionInternal = caretPositionInternal - 1;
 
-                    m_isLastKeyBackspace = true;
-
                     UpdateTouchKeyboardFromEditChanges();
                     SendOnValueChangedAndUpdateLabel();
                 }
@@ -2866,8 +2859,6 @@ public class ImmInputField : Selectable,
 
                     caretSelectPositionInternal = caretPositionInternal = caretPositionInternal - 1;
                 }
-
-                m_isLastKeyBackspace = true;
 
                 UpdateTouchKeyboardFromEditChanges();
                 SendOnValueChangedAndUpdateLabel();
@@ -3590,85 +3581,155 @@ public class ImmInputField : Selectable,
     /// <param name="isCharVisible"></param>
     private void AdjustRectTransformRelativeToViewport(Vector2 startPosition, float height, bool isCharVisible)
     {
-        //Debug.Log("Adjusting transform position relative to viewport.");
-
         if (m_TextViewport == null || m_IsDrivenByLayoutComponents)
             return;
 
-        float viewportMin = m_TextViewport.rect.xMin;
-        float viewportMax = m_TextViewport.rect.xMax;
-
-        //Debug.Log("Viewport Rect: " + viewportMax + "  Start Position: " + startPosition);
-        // Adjust the position of the RectTransform based on the caret position in the viewport.
-        float rightOffset = viewportMax - (m_TextComponent.rectTransform.anchoredPosition.x + startPosition.x + m_TextComponent.margin.z + m_CaretWidth);
-        if (rightOffset < 0f)
+        var textInfo = m_TextComponent.textInfo;
+        BoundingBox boundingBox;
+        boundingBox = new BoundingBox(textInfo.characterCount <= 0 ? Vector3.zero : textInfo.characterInfo[0].topLeft);
+        for (int i = 0; i < textInfo.lineCount; ++i)
         {
-            if (!multiLine || (multiLine && isCharVisible))
+            if (textInfo.lineInfo[i].characterCount <= 0)
+                continue;
+
+            var firstChar = textInfo.characterInfo[textInfo.lineInfo[i].firstCharacterIndex];
+            boundingBox = boundingBox.AddPoint(firstChar.topLeft);
+            boundingBox = boundingBox.AddPoint(firstChar.bottomRight);
+
+            var lastChar = textInfo.characterInfo[textInfo.lineInfo[i].lastCharacterIndex];
+            boundingBox = boundingBox.AddPoint(lastChar.topLeft);
+            boundingBox = boundingBox.AddPoint(lastChar.bottomRight);
+        }
+
+        var viewportRect = new Rect((Vector2)m_TextViewport.position - m_TextViewport.rect.size / 2, m_TextViewport.rect.size);
+
+        if (boundingBox.width < viewportRect.width)
+        {
+            var pos = m_TextComponent.rectTransform.position;
+            pos.x = m_TextViewport.position.x;
+            m_TextComponent.rectTransform.position = pos;
+        }
+        else
+        {
+            float moveMin, moveMax;
+            float totalMove = (boundingBox.width - viewportRect.width + m_TextComponent.margin.x + m_TextComponent.margin.z) * m_TextComponent.transform.lossyScale.x + m_CaretWidth * 3;
+            switch ((int)m_TextComponent.alignment & 0xff)
             {
-                //Debug.Log("Shifting text to the right by " + rightOffset.ToString("f3"));
-                m_TextComponent.rectTransform.anchoredPosition += new Vector2(rightOffset, 0);
+                case 1: // left
+                    moveMin = -totalMove;
+                    moveMax = 0;
+                    break;
 
-                AssignPositioningIfNeeded();
+                case 2: // center
+                    moveMin = -totalMove / 2;
+                    moveMax = totalMove / 2;
+                    break;
+
+                case 4: // right
+                    moveMin = 0;
+                    moveMax = totalMove;
+                    break;
+
+                default:
+                    throw new Exception("Only left, right, middle horizontal alignments are supported");
             }
+
+            var move = m_TextComponent.rectTransform.position.x - viewportRect.center.x;
+
+            var rightOffset = m_TextViewport.rect.xMax - (m_TextComponent.rectTransform.anchoredPosition.x + startPosition.x + m_TextComponent.margin.z + m_CaretWidth);
+            var leftOffset = (m_TextComponent.rectTransform.anchoredPosition.x + startPosition.x - m_TextComponent.margin.x) - m_TextViewport.rect.xMin;
+
+            if (rightOffset < 0)
+                move += rightOffset * m_TextComponent.transform.lossyScale.x;
+            if (leftOffset < 0)
+                move -= leftOffset * m_TextComponent.transform.lossyScale.x;
+            move = Mathf.Clamp(move, moveMin, moveMax);
+
+            m_TextComponent.rectTransform.position = m_TextViewport.position + Vector3.right * move;
         }
 
-        float leftOffset = (m_TextComponent.rectTransform.anchoredPosition.x + startPosition.x - m_TextComponent.margin.x) - viewportMin;
-        if (leftOffset < 0f)
-        {
-            //Debug.Log("Shifting text to the left by " + leftOffset.ToString("f3"));
-            m_TextComponent.rectTransform.anchoredPosition += new Vector2(-leftOffset, 0);
-            AssignPositioningIfNeeded();
-        }
-
-
-        // Adjust text area up or down if not in single line mode.
         if (m_LineType != TMP_InputField.LineType.SingleLine)
         {
-            float topOffset = m_TextViewport.rect.yMax - (m_TextComponent.rectTransform.anchoredPosition.y + startPosition.y + height);
-            if (topOffset < -0.0001f)
+            if (boundingBox.height < viewportRect.height)
             {
-                m_TextComponent.rectTransform.anchoredPosition += new Vector2(0, topOffset);
-                AssignPositioningIfNeeded();
+                var pos = m_TextComponent.rectTransform.position;
+                pos.y = m_TextViewport.position.y;
+                m_TextComponent.rectTransform.position = pos;
+
+                m_IsScrollbarUpdateRequired = true;
+            }
+            else
+            {
+                float moveMin = 0, moveMax = (boundingBox.height - viewportRect.height + m_TextComponent.margin.y + m_TextComponent.margin.w) * m_TextComponent.transform.lossyScale.x;
+
+                var move = m_TextComponent.rectTransform.position.y - viewportRect.center.y;
+
+                var topOffset = m_TextViewport.rect.yMax - (m_TextComponent.rectTransform.anchoredPosition.y + startPosition.y + height);
+                var bottomOffset = (m_TextComponent.rectTransform.anchoredPosition.y + startPosition.y) - m_TextViewport.rect.yMin;
+
+                if (topOffset < -0.0001f) // ?
+                    move += topOffset;
+                if (bottomOffset < 0)
+                    move -= bottomOffset;
+                move = Mathf.Clamp(move, moveMin, moveMax);
+
+                m_TextComponent.rectTransform.position = m_TextViewport.position + Vector3.up * move;
+
                 m_IsScrollbarUpdateRequired = true;
             }
 
-            float bottomOffset = (m_TextComponent.rectTransform.anchoredPosition.y + startPosition.y) - m_TextViewport.rect.yMin;
-            if (bottomOffset < 0f)
-            {
-                m_TextComponent.rectTransform.anchoredPosition -= new Vector2(0, bottomOffset);
-                AssignPositioningIfNeeded();
-                m_IsScrollbarUpdateRequired = true;
-            }
         }
 
-        // Special handling of backspace
-        if (m_isLastKeyBackspace)
-        {
-            float firstCharPosition = m_TextComponent.rectTransform.anchoredPosition.x + m_TextComponent.textInfo.characterInfo[0].origin - m_TextComponent.margin.x;
-            float lastCharPosition = m_TextComponent.rectTransform.anchoredPosition.x + m_TextComponent.textInfo.characterInfo[m_TextComponent.textInfo.characterCount - 1].origin + m_TextComponent.margin.z;
-
-            // Check if caret is at the left most position of the viewport
-            if (m_TextComponent.rectTransform.anchoredPosition.x + startPosition.x <= viewportMin + 0.0001f)
-            {
-                if (firstCharPosition < viewportMin)
-                {
-                    float offset = Mathf.Min((viewportMax - viewportMin) / 2, viewportMin - firstCharPosition);
-                    m_TextComponent.rectTransform.anchoredPosition += new Vector2(offset, 0);
-                    AssignPositioningIfNeeded();
-                }
-            }
-            else if (lastCharPosition < viewportMax && firstCharPosition < viewportMin)
-            {
-                float offset = Mathf.Min(viewportMax - lastCharPosition, viewportMin - firstCharPosition);
-
-                m_TextComponent.rectTransform.anchoredPosition += new Vector2(offset, 0);
-                AssignPositioningIfNeeded();
-            }
-
-            m_isLastKeyBackspace = false;
-        }
+        AssignPositioningIfNeeded();
 
         m_forceRectTransformAdjustment = false;
+
+        //// Adjust text area up or down if not in single line mode.
+        //if (m_LineType != TMP_InputField.LineType.SingleLine)
+        //{
+        //    float 
+        //    if (topOffset < -0.0001f)
+        //    {
+        //        m_TextComponent.rectTransform.anchoredPosition += new Vector2(0, topOffset);
+        //        AssignPositioningIfNeeded();
+        //        m_IsScrollbarUpdateRequired = true;
+        //    }
+
+        //    float 
+        //    if (bottomOffset < 0f)
+        //    {
+        //        m_TextComponent.rectTransform.anchoredPosition -= new Vector2(0, bottomOffset);
+        //        AssignPositioningIfNeeded();
+        //        m_IsScrollbarUpdateRequired = true;
+        //    }
+        //}
+
+        // Special handling of backspace
+        //if (m_isLastKeyBackspace)
+        //{
+        //    float firstCharPosition = m_TextComponent.rectTransform.anchoredPosition.x + m_TextComponent.textInfo.characterInfo[0].origin - m_TextComponent.margin.x;
+        //    float lastCharPosition = m_TextComponent.rectTransform.anchoredPosition.x + m_TextComponent.textInfo.characterInfo[m_TextComponent.textInfo.characterCount - 1].origin + m_TextComponent.margin.z;
+
+        //    // Check if caret is at the left most position of the viewport
+        //    if (m_TextComponent.rectTransform.anchoredPosition.x + startPosition.x <= viewportMin + 0.0001f)
+        //    {
+        //        if (firstCharPosition < viewportMin)
+        //        {
+        //            float offset = Mathf.Min((viewportMax - viewportMin) / 2, viewportMin - firstCharPosition);
+        //            m_TextComponent.rectTransform.anchoredPosition += new Vector2(offset, 0);
+        //            AssignPositioningIfNeeded();
+        //        }
+        //    }
+        //    else if (lastCharPosition < viewportMax && firstCharPosition < viewportMin)
+        //    {
+        //        float offset = Mathf.Min(viewportMax - lastCharPosition, viewportMin - firstCharPosition);
+
+        //        m_TextComponent.rectTransform.anchoredPosition += new Vector2(offset, 0);
+        //        AssignPositioningIfNeeded();
+        //    }
+
+        //    m_isLastKeyBackspace = false;
+        //}
     }
 
     /// <summary>
@@ -3935,7 +3996,7 @@ public class ImmInputField : Selectable,
 
     public override void OnDeselect(BaseEventData eventData)
     {
-        if (keepFocus)
+        if (keepFocus && isActiveAndEnabled)
         {
             base.OnDeselect(eventData);
             StartCoroutine(SelectMe());
@@ -4095,16 +4156,16 @@ public class ImmInputField : Selectable,
         contentType = TMP_InputField.ContentType.Custom;
     }
 
-    void SetToCustom(TMP_InputField.CharacterValidation characterValidation)
+    void SetToCustom(TMP_InputField.CharacterValidation _characterValidation)
     {
         if (contentType == TMP_InputField.ContentType.Custom)
         {
-            characterValidation = TMP_InputField.CharacterValidation.CustomValidator;
+            this.characterValidation = TMP_InputField.CharacterValidation.CustomValidator;
             return;
         }
 
         contentType = TMP_InputField.ContentType.Custom;
-        characterValidation = TMP_InputField.CharacterValidation.CustomValidator;
+        this.characterValidation = TMP_InputField.CharacterValidation.CustomValidator;
     }
 
 
@@ -4118,10 +4179,54 @@ public class ImmInputField : Selectable,
         base.DoStateTransition(state, instant);
     }
 
+    private void OnApplicationPause(bool pause)
+    {
+        if (pause)
+        {
+            if (m_SoftKeyboard != null)
+                DeactivateInputField();
+
+            if (keepFocus)
+                takeFocusAfterApplicationResumed = true;
+        }
+        else
+        {
+            if (takeFocusAfterApplicationFocusRestored || takeFocusAfterApplicationResumed)
+            {
+                takeFocusAfterApplicationFocusRestored = false;
+                takeFocusAfterApplicationResumed = false;
+                StopCoroutine(nameof(ActivateAfterApplicationFocusRestored)); // stop previous instances of this coroutine
+                StartCoroutine(nameof(ActivateAfterApplicationFocusRestored));
+            }
+        }
+    }
+
     void OnApplicationFocus(bool focus)
     {
-        if (!focus && m_SoftKeyboard != null)
-            DeactivateInputField();
+        if (!focus)
+        {
+            if (m_SoftKeyboard != null)
+                DeactivateInputField();
+
+            if (keepFocus)
+                takeFocusAfterApplicationFocusRestored = true;
+        }
+        else
+        {
+            if (takeFocusAfterApplicationFocusRestored || takeFocusAfterApplicationResumed)
+            {
+                takeFocusAfterApplicationFocusRestored = false;
+                takeFocusAfterApplicationResumed = false;
+                StopCoroutine(nameof(ActivateAfterApplicationFocusRestored)); // stop previous instances of this coroutine
+                StartCoroutine(nameof(ActivateAfterApplicationFocusRestored));
+            }
+        }
+    }
+
+    IEnumerator ActivateAfterApplicationFocusRestored()
+    {
+        yield return null;
+        ActivateInputField();
     }
 
     protected override void OnDestroy()

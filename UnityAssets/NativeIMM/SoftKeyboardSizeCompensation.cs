@@ -13,12 +13,12 @@ public class SoftKeyboardSizeCompensation : MonoBehaviour
 
         rectTransform.pivot = new Vector2(0.5f, 1.0f);
 
-        NativeImm.VisibleHeightChanged += UpdateScreenHeight;
+        NativeImm.Instance.VisibleHeightChanged += UpdateScreenHeight;
     }
 
     void OnDestroy()
     {
-        NativeImm.VisibleHeightChanged -= UpdateScreenHeight;
+        NativeImm.Instance.VisibleHeightChanged -= UpdateScreenHeight;
     }
 
     private void UpdateScreenHeight(float ratio)

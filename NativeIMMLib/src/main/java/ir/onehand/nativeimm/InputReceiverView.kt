@@ -10,6 +10,7 @@ import android.text.Selection
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
@@ -18,17 +19,29 @@ import com.unity3d.player.UnityPlayer
 import org.json.JSONObject
 
 @SuppressLint("ViewConstructor")
-class InputReceiverView(private val immManager: IMMManager, private val viewID: Int, params: InputReceiverParams) :
-    View(immManager.relativeLayout.context) {
+class InputReceiverView(parentGroup: ViewGroup) :
+    View(parentGroup.context) {
+
+    private val relativeLayout = RelativeLayout(UnityPlayer.currentActivity)
+
+    init {
+        parentGroup.addView(
+            relativeLayout,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+    }
 
     private val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
 
     private val editable = Editable.Factory.getInstance().newEditable("")
 
-    private val imeOptions = getImeOptions(params)
-    private val inputType = getInputType(params)
-    private val multiline = params.multiline
-    private val closeWithBackButton = params.closeWithBackButton
+    private var imeOptions = 0
+    private var inputType = 0
+    private var multiline = false
+    private var closeWithBackButton = false
 
     private val eventReceiver = object : UnityInputConnectionEventReceiver {
         override fun onEdit(contents: EditableTextInfo) {
@@ -55,46 +68,70 @@ class InputReceiverView(private val immManager: IMMManager, private val viewID: 
         isFocusable = true
         isFocusableInTouchMode = true
 
-        immManager.relativeLayout.addView(this)
-
-        sendMessage(UnityInterop.MessageName.ViewCreated)
+        relativeLayout.addView(this)
     }
 
     // interop method
-    fun setActive(focus: Boolean) {
+    fun open(params: InputReceiverParams) =
         UnityInterop.executePluginFunction {
-            if (focus) {
-                if (!requestFocus()) {
-                    Log.e(LOG_TAG, "InputReceiverView failed to take focus")
+            imeOptions = getImeOptions(params)
+            inputType = getInputType(params)
+            multiline = params.multiline
+            closeWithBackButton = params.closeWithBackButton
+
+            if (!requestFocus()) {
+                Log.e(LOG_TAG, "InputReceiverView failed to take focus")
+            }
+            showKeyboard()
+        }
+
+    // interop method
+    fun close() =
+        UnityInterop.executePluginFunction {
+            hideKeyboard()
+        }
+
+    // interop method
+    fun updateStatus(setText: Boolean, text: String, setSelection: Boolean, selectionStart: Int, selectionEnd: Int) =
+        UnityInterop.executePluginFunction {
+            if (setText) {
+                editable.replace(0, editable.length, text)
+
+                if (!setSelection) {
+                    Selection.setSelection(editable, editable.length, editable.length)
+                    imm.restartInput(this)
                 }
-                showKeyboard()
-            } else {
-                clearFocus()
-                hideKeyboard()
+            }
+
+            if (setSelection) {
+                var start = selectionStart
+                var end = selectionEnd
+                if (start > end) {
+                    val temp = start
+                    start = end
+                    end = temp
+                }
+
+                UnityInputConnection.removeComposingSpans(editable)
+
+                Selection.setSelection(
+                    editable,
+                    if (start < 0 || start > editable.length) editable.length else start,
+                    if (end < 0 || end > editable.length) editable.length else end
+                )
+
+                imm.restartInput(this)
             }
         }
-    }
 
     // interop method
-    fun setSelection(selectionStart: Int, selectionEnd: Int) {
-        var start = selectionStart
-        var end = selectionEnd
-        if (start > end) {
-            val temp = start
-            start = end
-            end = temp
+    fun destroy() =
+        UnityInterop.executePluginFunction {
+            if (isFocused)
+                hideKeyboard()
+
+            relativeLayout.removeView(this)
         }
-
-        UnityInputConnection.removeComposingSpans(editable)
-
-        Selection.setSelection(
-            editable,
-            if (start < 0 || start > editable.length) editable.length else start,
-            if (end < 0 || end > editable.length) editable.length else end
-        )
-
-        imm.restartInput(this)
-    }
 
     override fun onKeyPreIme(keyCode: Int, event: KeyEvent?): Boolean {
         if (!closeWithBackButton && keyCode == KeyEvent.KEYCODE_BACK)
@@ -103,36 +140,20 @@ class InputReceiverView(private val immManager: IMMManager, private val viewID: 
         return super.onKeyPreIme(keyCode, event)
     }
 
-    // interop method
-    // Set text and move cursor to end of it
-    fun setText(text: String) {
-        editable.replace(0, editable.length, text)
-        setSelection(-1, -1)
-
-        imm.restartInput(this)
-    }
-
-    // interop method
-    fun destroy() {
-        UnityInterop.executePluginFunction {
-            if (isFocused)
-                hideKeyboard()
-
-            immManager.relativeLayout.removeView(this)
-            immManager.onViewDestroyed(this)
-        }
-    }
-
     private fun showKeyboard() {
+        if (UnityInterop.isDebugMode)
+            Log.i(LOG_TAG, "Opening keyboard")
+
         imm.showSoftInput(this, InputMethodManager.SHOW_FORCED)
     }
 
     fun hideKeyboard() {
+        if (UnityInterop.isDebugMode)
+            Log.i(LOG_TAG, "Closing keyboard")
+
         clearFocus()
-        if (immManager.getFocusedView() == null) {
-            UnityPlayer.currentActivity.window.decorView.clearFocus()
-            imm.hideSoftInputFromWindow(windowToken, 0)
-        }
+        UnityPlayer.currentActivity.window.decorView.clearFocus()
+        imm.hideSoftInputFromWindow(windowToken, 0)
     }
 
     private fun sendMessage(name: UnityInterop.MessageName, putArgs: ((JSONObject) -> Unit)? = null) {
@@ -142,16 +163,13 @@ class InputReceiverView(private val immManager: IMMManager, private val viewID: 
         UnityInterop.sendMessage(name, args)
     }
 
-    private fun makeMessageArgs(): JSONObject {
-        val result = JSONObject()
-        result.put("id", viewID)
-        return result
-    }
+    private fun makeMessageArgs() = JSONObject()
 
     override fun onCheckIsTextEditor(): Boolean = true
 
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection {
-        val connection = UnityInputConnection(eventReceiver, editable, this, multiline) // BaseInputConnection(this, false)
+        val connection =
+            UnityInputConnection(eventReceiver, editable, this, multiline) // BaseInputConnection(this, false)
 
         outAttrs.imeOptions =
             imeOptions or

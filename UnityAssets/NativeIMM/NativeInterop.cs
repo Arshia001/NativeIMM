@@ -53,7 +53,7 @@ public class EditableTextInfo
     public int SelectionStart { get; }
     public int SelectionEnd { get; }
 
-    public override string ToString() => 
+    public override string ToString() =>
         $"EditableTextInfo: '{Text}', selection {SelectionStart} - {SelectionEnd}, composing {ComposingStart} - {ComposingEnd}";
 }
 
@@ -83,13 +83,10 @@ class NativeInterop : MonoBehaviour
     public delegate void InitDoneDelegate();
     public event InitDoneDelegate InitDone;
 
-    public delegate void ViewCreatedDelegate(int id);
-    public event ViewCreatedDelegate ViewCreated;
-
-    public delegate void EnterPressedDelegate(int id);
+    public delegate void EnterPressedDelegate();
     public event EnterPressedDelegate EnterPressed;
 
-    public delegate void TextChangedDelegate(int id, EditableTextInfo textInfo);
+    public delegate void TextChangedDelegate(EditableTextInfo textInfo);
     public event TextChangedDelegate TextChanged;
 
     public delegate void ErrorReceivedDelegate(string code, string message, JSONObject data);
@@ -105,7 +102,6 @@ class NativeInterop : MonoBehaviour
         var json = JSON.Parse(dataString);
         var name = json["name"].AsString;
         var args = json["args"].AsObject;
-        var id = args["id"].AsInt;
 
         switch (name)
         {
@@ -117,16 +113,12 @@ class NativeInterop : MonoBehaviour
                 InitDone?.Invoke();
                 break;
 
-            case "VIEW_CREATED":
-                ViewCreated?.Invoke(id.Value);
-                break;
-
             case "ENTER_PRESSED":
-                EnterPressed?.Invoke(id.Value);
+                EnterPressed?.Invoke();
                 break;
 
             case "TEXT_CHANGED":
-                TextChanged?.Invoke(id.Value, new EditableTextInfo(args));
+                TextChanged?.Invoke(new EditableTextInfo(args));
                 break;
 
             default:
@@ -154,26 +146,20 @@ class NativeInterop : MonoBehaviour
     public void Destroy() =>
         nativeClass.CallStatic("destroy");
 
-    public AndroidJavaObject GetIMMManager() =>
-        nativeClass.CallStatic<AndroidJavaObject>("getIMMManager");
+    public AndroidJavaObject GetInputReceiverView() =>
+        nativeClass.CallStatic<AndroidJavaObject>("getReceiverView");
 
     public void SetDebugMode(bool enabled) =>
         nativeClass.CallStatic("setDebugModeEnabled", enabled);
 
-    public int CreateInputReceiverView(AndroidJavaObject immManager, InputReceiverParams inputReceiverParams) =>
-        immManager.Call<int>("createInputReceiver", inputReceiverParams.ToJavaObject());
+    public void Open(AndroidJavaObject inputReceiverView, InputReceiverParams receiverParams) =>
+        inputReceiverView.Call("open", receiverParams.ToJavaObject());
 
-    public AndroidJavaObject GetInputReceiverView(AndroidJavaObject immManager, int id) =>
-        immManager.Call<AndroidJavaObject>("getView", id);
+    public void Close(AndroidJavaObject inputReceiverView) =>
+        inputReceiverView.Call("close");
 
-    public void SetText(AndroidJavaObject inputReceiverView, string text) =>
-        inputReceiverView.Call("setText", text);
-
-    public void SetActive(AndroidJavaObject inputReceiverView, bool focus) =>
-        inputReceiverView.Call("setActive", focus);
-
-    public void SetSelection(AndroidJavaObject inputReceiverView, int selectionStart, int selectionEnd) =>
-        inputReceiverView.Call("setSelection", selectionStart, selectionEnd);
+    public void UpdateStatus(AndroidJavaObject inputReceiverView, bool setText, string text, bool setSelection, int selectionStart, int selectionEnd) =>
+        inputReceiverView.Call("updateStatus", setText, text, setSelection, selectionStart, selectionEnd);
 
     public void DestroyReceiver(AndroidJavaObject inputReceiverView) =>
         inputReceiverView.Call("destroy");

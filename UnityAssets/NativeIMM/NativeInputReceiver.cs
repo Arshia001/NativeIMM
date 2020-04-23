@@ -10,21 +10,18 @@ using UnityEngine;
 
 public class NativeInputReceiver
 {
-    internal int ID { get; private set; }
-
-    internal AndroidJavaObject NativeObject { get; private set; }
-
-    bool active;
     public bool Active
     {
-        get => active;
+        get => NativeImm.Instance.NextActiveInputReceiver == this;
         set
         {
             if (NativeImm.DebugMode)
-                Debug.Log($"Setting {nameof(active)}: {value}");
+                Debug.Log($"Setting {nameof(value)}: {value}");
 
-            active = value;
-            NativeInterop.Instance.SetActive(NativeObject, value);
+            if (value)
+                NativeImm.Instance.Activate(this);
+            else
+                NativeImm.Instance.Deactivate(this);
         }
     }
 
@@ -37,8 +34,11 @@ public class NativeInputReceiver
             if (NativeImm.DebugMode)
                 Debug.Log($"Setting {nameof(text)}: {value}");
 
-            text = value;
-            NativeInterop.Instance.SetText(NativeObject, value);
+            if (text != value)
+            {
+                text = value;
+                NativeImm.Instance.TextUpdated(this);
+            }
         }
     }
 
@@ -52,10 +52,17 @@ public class NativeInputReceiver
                 Debug.Log($"Setting {nameof(selection)}: {value.start} - {value.end}");
 
             selection = value;
-            var (start, end) = UnityRangeToAndroidRange(value);
-            NativeInterop.Instance.SetSelection(NativeObject, start, end);
+
+            var range = UnityRangeToAndroidRange(value);
+            if (range != NativeSelectionRange)
+            {
+                NativeSelectionRange = range;
+                NativeImm.Instance.SelectionUpdated(this);
+            }
         }
     }
+
+    internal (int start, int end) NativeSelectionRange { get; private set; }
 
     public RangeInt? composition;
 
@@ -65,7 +72,11 @@ public class NativeInputReceiver
 
     public event Action<NativeInputReceiver> TextChanged;
 
+    public InputReceiverParams ReceiverParams { get; private set; }
+
     private NativeInputReceiver() { }
+
+    ~NativeInputReceiver() => Destroy();
 
     public static async Task<NativeInputReceiver> Open(string text, TMPro.TMP_InputField.ContentType contentType,
         TMPro.TMP_InputField.InputType inputType, TouchScreenKeyboardType keyboardType, ReturnKeyType returnKeyType,
@@ -80,12 +91,12 @@ public class NativeInputReceiver
             KeyboardType = keyboardType,
             InputType = inputType,
             ReturnKeyType = returnKeyType,
-            CloseWithBackButton = closeWithBackButton 
+            CloseWithBackButton = closeWithBackButton
         }, text);
 
         receiver.Active = true;
 
-        NativeImm.KeyboardStateChanged += receiver.OnKeyboardStatusChanged;
+        NativeImm.Instance.KeyboardStateChanged += receiver.OnKeyboardStatusChanged;
 
         return receiver;
     }
@@ -101,22 +112,16 @@ public class NativeInputReceiver
 
     async Task InitializeNativeField(InputReceiverParams receiverParams, string initialText)
     {
-        await NativeImm.Initialize();
+        await NativeImm.Instance.Initialize();
 
-        (ID, NativeObject) = await NativeImm.CreateView(this, receiverParams);
+        ReceiverParams = receiverParams;
+        text = initialText;
 
-        NativeInterop.Instance.SetText(NativeObject, initialText);
+        selection = new RangeInt(initialText.Length, 0);
+        NativeSelectionRange = (initialText.Length, initialText.Length);
     }
 
-    public void Destroy()
-    {
-        NativeImm.KeyboardStateChanged -= OnKeyboardStatusChanged;
-
-        if (NativeObject != null)
-            NativeImm.DestroyReceiver(this);
-
-        NativeObject = null;
-    }
+    public void Destroy() => NativeImm.Instance.KeyboardStateChanged -= OnKeyboardStatusChanged;
 
     internal void OnTextChanged(EditableTextInfo textInfo)
     {
@@ -143,13 +148,22 @@ public class NativeInputReceiver
         Submit?.Invoke();
     }
 
+    internal void OnDeactivated()
+    {
+        if (NativeImm.DebugMode)
+            Debug.Log($"Input receiver lost focus");
+
+        Closed?.Invoke();
+    }
+
     internal void OnKeyboardStatusChanged(bool shown)
     {
-        if (!shown && active)
+        if (!shown && Active)
         {
             if (NativeImm.DebugMode)
                 Debug.Log($"Soft keyboard closed");
 
+            Active = false;
             Closed?.Invoke();
         }
     }

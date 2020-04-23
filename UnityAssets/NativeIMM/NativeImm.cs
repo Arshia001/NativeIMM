@@ -1,14 +1,13 @@
 ﻿// #define NATIVE_IMM_DEBUG_MODE
 
+#pragma warning disable CS0162 // Unreachable code detected
+
 using System;
-using System.Collections;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
 
-public static class NativeImm
+public class NativeImm : MonoBehaviour
 {
 #if NATIVE_IMM_DEBUG_MODE
     public const bool DebugMode = true;
@@ -16,29 +15,40 @@ public static class NativeImm
     public const bool DebugMode = false;
 #endif
 
-    static TaskCompletionSource<object> initializeTCS;
+    static NativeImm instance;
 
-    static AndroidJavaObject immManager;
+    public static NativeImm Instance =>
+        instance ?? (instance = NativeInterop.Instance.gameObject.AddComponent<NativeImm>());
 
-    static readonly Dictionary<int, NativeInputReceiver> receivers = new Dictionary<int, NativeInputReceiver>();
-    static readonly Dictionary<int, TaskCompletionSource<(int id, AndroidJavaObject nativeObj)>> receiverTCSs =
-        new Dictionary<int, TaskCompletionSource<(int id, AndroidJavaObject nativeObj)>>();
+    TaskCompletionSource<object> initializeTCS;
+
+    AndroidJavaObject inputReceiverView;
+
+    NativeInputReceiver activeInputReceiver;
+
+    NativeInputReceiver receiverToActivate;
+    bool deactivateCurrentlyActiveReceiver;
+    bool textUpdated;
+    bool selectionUpdated;
+
+    internal NativeInputReceiver NextActiveInputReceiver =>
+        receiverToActivate ?? (deactivateCurrentlyActiveReceiver ? null : activeInputReceiver);
 
     public delegate void VisibleHeightChangedDelegate(float visibleHeightRatio);
-    public static event VisibleHeightChangedDelegate VisibleHeightChanged;
+    public event VisibleHeightChangedDelegate VisibleHeightChanged;
 
     public delegate void InputReceiverEventDelegate(NativeInputReceiver receiver);
-    public static event InputReceiverEventDelegate EnterPressed;
+    public event InputReceiverEventDelegate EnterPressed;
 
     public delegate void InputReceiverTextChangedDelegate(NativeInputReceiver receiver, EditableTextInfo textInfo);
-    public static event InputReceiverTextChangedDelegate TextChanged;
+    public event InputReceiverTextChangedDelegate TextChanged;
 
     public delegate void KeyboardStateChangedDelegate(bool shown);
-    public static event KeyboardStateChangedDelegate KeyboardStateChanged;
+    public event KeyboardStateChangedDelegate KeyboardStateChanged;
 
-    public static bool KeyboardVisible { get; private set; }
+    public bool KeyboardVisible { get; private set; }
 
-    public static Task Initialize()
+    public Task Initialize()
     {
         if (initializeTCS != null)
             return initializeTCS.Task;
@@ -49,7 +59,6 @@ public static class NativeImm
 
         ni.TextChanged += OnTextChanged; ;
         ni.EnterPressed += OnEnterPressed;
-        ni.ViewCreated += OnViewCreated;
         ni.VisibleHeightChanged += OnVisibleHeightChanged;
         ni.InitDone += OnInitDone;
 
@@ -61,11 +70,11 @@ public static class NativeImm
         return initializeTCS.Task;
     }
 
-    static void CompleteInit()
+    void CompleteInit()
     {
         try
         {
-            immManager = NativeInterop.Instance.GetIMMManager();
+            inputReceiverView = NativeInterop.Instance.GetInputReceiverView();
             initializeTCS?.TrySetResult(null);
         }
         catch (Exception ex)
@@ -74,48 +83,25 @@ public static class NativeImm
         }
     }
 
-    static void OnInitDone() => CompleteInit();
+    void OnInitDone() => CompleteInit();
 
-    public static void Destroy()
+    void OnDestroy() => Destroy();
+
+    public void Destroy()
     {
         var ni = NativeInterop.Instance;
 
         ni.TextChanged -= OnTextChanged;
         ni.EnterPressed -= OnEnterPressed;
-        ni.ViewCreated -= OnViewCreated;
         ni.VisibleHeightChanged -= OnVisibleHeightChanged;
         ni.InitDone -= OnInitDone;
 
-        receivers.Clear();
-        receiverTCSs.Clear();
+        ni.DestroyReceiver(inputReceiverView);
+
         initializeTCS = null;
     }
 
-    internal static Task<(int id, AndroidJavaObject nativeObj)> CreateView(NativeInputReceiver receiver, InputReceiverParams inputReceiverParams)
-    {
-        var tcs = new TaskCompletionSource<(int id, AndroidJavaObject nativeObj)>();
-        var id = NativeInterop.Instance.CreateInputReceiverView(immManager, inputReceiverParams);
-        receivers[id] = receiver;
-        receiverTCSs[id] = tcs;
-        return tcs.Task;
-    }
-
-    static void OnViewCreated(int id)
-    {
-        if (receiverTCSs.TryGetValue(id, out var tcs))
-        {
-            tcs.SetResult((id, NativeInterop.Instance.GetInputReceiverView(immManager, id)));
-            receiverTCSs.Remove(id);
-        }
-    }
-
-    internal static void DestroyReceiver(NativeInputReceiver receiver)
-    {
-        receivers.Remove(receiver.ID);
-        NativeInterop.instance.DestroyReceiver(receiver.NativeObject);
-    }
-
-    static void OnVisibleHeightChanged(int visibleHeight)
+    void OnVisibleHeightChanged(int visibleHeight)
     {
         var ratio = visibleHeight / (float)Screen.height;
         if (ratio >= 0.9f)
@@ -131,21 +117,102 @@ public static class NativeImm
         KeyboardVisible = visible;
     }
 
-    static void OnEnterPressed(int id)
+    void OnEnterPressed()
     {
-        if (receivers.TryGetValue(id, out var receiver))
+        if (activeInputReceiver != null)
         {
-            EnterPressed?.Invoke(receiver);
-            receiver.OnEnterPressed();
+            EnterPressed?.Invoke(activeInputReceiver);
+            activeInputReceiver.OnEnterPressed();
         }
     }
 
-    private static void OnTextChanged(int id, EditableTextInfo textInfo)
+    private void OnTextChanged(EditableTextInfo textInfo)
     {
-        if (receivers.TryGetValue(id, out var receiver))
+        if (activeInputReceiver != null)
         {
-            TextChanged?.Invoke(receiver, textInfo);
-            receiver.OnTextChanged(textInfo);
+            TextChanged?.Invoke(activeInputReceiver, textInfo);
+            activeInputReceiver.OnTextChanged(textInfo);
+        }
+    }
+
+    public void Activate(NativeInputReceiver receiver)
+    {
+        if (activeInputReceiver != receiver)
+            receiverToActivate = receiver;
+        else
+            receiverToActivate = null;
+    }
+
+    public void Deactivate(NativeInputReceiver receiver)
+    {
+        if (activeInputReceiver == receiver)
+            deactivateCurrentlyActiveReceiver = true;
+    }
+
+    public void TextUpdated(NativeInputReceiver receiver)
+    {
+        if (activeInputReceiver == receiver)
+            textUpdated = true;
+    }
+
+    public void SelectionUpdated(NativeInputReceiver receiver)
+    {
+        if (activeInputReceiver == receiver)
+            selectionUpdated = true;
+    }
+
+    void LateUpdate()
+    {
+        var ni = NativeInterop.Instance;
+
+        if (receiverToActivate != null)
+        {
+            if (DebugMode)
+                Debug.Log($"Activating new input receiver with text = '{receiverToActivate.Text}'");
+
+            if (activeInputReceiver != null)
+                activeInputReceiver.OnDeactivated();
+
+            deactivateCurrentlyActiveReceiver = false;
+            textUpdated = false;
+            selectionUpdated = false;
+            activeInputReceiver = receiverToActivate;
+            receiverToActivate = null;
+
+            ni.Open(inputReceiverView, activeInputReceiver.ReceiverParams);
+            ni.UpdateStatus(inputReceiverView, true, activeInputReceiver.Text, true, activeInputReceiver.Selection.start, activeInputReceiver.Selection.end);
+        }
+
+        if (deactivateCurrentlyActiveReceiver)
+        {
+            if (DebugMode)
+                Debug.Log("Deactivating input receiver");
+
+            deactivateCurrentlyActiveReceiver = false;
+
+            activeInputReceiver = null;
+            ni.Close(inputReceiverView);
+        }
+
+        if (textUpdated || selectionUpdated)
+        {
+            if (DebugMode)
+                Debug.Log($"Updating status: text = '{(textUpdated ? activeInputReceiver.Text : "NO CHANGE")}', " +
+                    $"selection = {(selectionUpdated ? activeInputReceiver.Selection.start.ToString() : "NO CHANGE")} - " +
+                    $"{(selectionUpdated ? activeInputReceiver.Selection.end.ToString() : "NO CHANGE")}");
+
+            if (activeInputReceiver != null)
+                ni.UpdateStatus(
+                    inputReceiverView,
+                    textUpdated,
+                    textUpdated ? activeInputReceiver.Text : "",
+                    selectionUpdated,
+                    selectionUpdated ? activeInputReceiver.Selection.start : 0,
+                    selectionUpdated ? activeInputReceiver.Selection.end : 0
+                    );
+
+            textUpdated = false;
+            selectionUpdated = false;
         }
     }
 }
