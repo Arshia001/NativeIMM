@@ -16,7 +16,7 @@ public class NativeInputReceiver
         set
         {
             if (NativeImm.DebugMode)
-                Debug.Log($"Setting {nameof(value)}: {value}");
+                Debug.Log($"Setting {nameof(Active)}: {value}");
 
             if (value)
                 NativeImm.Instance.Activate(this);

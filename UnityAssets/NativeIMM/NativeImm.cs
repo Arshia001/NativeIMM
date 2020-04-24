@@ -27,12 +27,12 @@ public class NativeImm : MonoBehaviour
     NativeInputReceiver activeInputReceiver;
 
     NativeInputReceiver receiverToActivate;
-    bool deactivateCurrentlyActiveReceiver;
+    int deactivateCurrentlyActiveReceiver;
     bool textUpdated;
     bool selectionUpdated;
 
     internal NativeInputReceiver NextActiveInputReceiver =>
-        receiverToActivate ?? (deactivateCurrentlyActiveReceiver ? null : activeInputReceiver);
+        receiverToActivate ?? (deactivateCurrentlyActiveReceiver > 0 ? null : activeInputReceiver);
 
     public delegate void VisibleHeightChangedDelegate(float visibleHeightRatio);
     public event VisibleHeightChangedDelegate VisibleHeightChanged;
@@ -146,7 +146,7 @@ public class NativeImm : MonoBehaviour
     public void Deactivate(NativeInputReceiver receiver)
     {
         if (activeInputReceiver == receiver)
-            deactivateCurrentlyActiveReceiver = true;
+            deactivateCurrentlyActiveReceiver = 2;
     }
 
     public void TextUpdated(NativeInputReceiver receiver)
@@ -173,25 +173,31 @@ public class NativeImm : MonoBehaviour
             if (activeInputReceiver != null)
                 activeInputReceiver.OnDeactivated();
 
-            deactivateCurrentlyActiveReceiver = false;
+            ni.Open(inputReceiverView, receiverToActivate.ReceiverParams);
+            ni.UpdateStatus(inputReceiverView, true, receiverToActivate.Text, true, receiverToActivate.Selection.start, receiverToActivate.Selection.end);
+
+            deactivateCurrentlyActiveReceiver = 0;
             textUpdated = false;
             selectionUpdated = false;
             activeInputReceiver = receiverToActivate;
             receiverToActivate = null;
-
-            ni.Open(inputReceiverView, activeInputReceiver.ReceiverParams);
-            ni.UpdateStatus(inputReceiverView, true, activeInputReceiver.Text, true, activeInputReceiver.Selection.start, activeInputReceiver.Selection.end);
         }
 
-        if (deactivateCurrentlyActiveReceiver)
+        if (deactivateCurrentlyActiveReceiver > 0)
         {
-            if (DebugMode)
-                Debug.Log("Deactivating input receiver");
+            --deactivateCurrentlyActiveReceiver;
 
-            deactivateCurrentlyActiveReceiver = false;
+            if (deactivateCurrentlyActiveReceiver == 0)
+            {
+                if (DebugMode)
+                    Debug.Log("Deactivating input receiver");
 
-            activeInputReceiver = null;
-            ni.Close(inputReceiverView);
+                activeInputReceiver = null;
+                ni.Close(inputReceiverView);
+            }
+            else
+                if (DebugMode)
+                    Debug.Log($"Will deactivate input receiver in {deactivateCurrentlyActiveReceiver} frames");
         }
 
         if (textUpdated || selectionUpdated)

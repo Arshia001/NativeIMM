@@ -3906,7 +3906,9 @@ public class ImmInputField : Selectable,
 
     public override void OnSelect(BaseEventData eventData)
     {
-        //Debug.Log("OnSelect()");
+#if TMP_DEBUG_MODE
+        Debug.Log("OnSelect " + gameObject.name);
+#endif
 
         base.OnSelect(eventData);
         SendOnFocus();
@@ -3996,6 +3998,9 @@ public class ImmInputField : Selectable,
 
     public override void OnDeselect(BaseEventData eventData)
     {
+#if TMP_DEBUG_MODE
+        Debug.Log("OnDeselect " + gameObject.name);
+#endif
         if (keepFocus && isActiveAndEnabled)
         {
             base.OnDeselect(eventData);
@@ -4181,6 +4186,10 @@ public class ImmInputField : Selectable,
 
     private void OnApplicationPause(bool pause)
     {
+#if TMP_DEBUG_MODE
+        Debug.Log("OnApplicationPause " + pause.ToString());
+#endif
+
         if (pause)
         {
             if (m_SoftKeyboard != null)
@@ -4203,6 +4212,10 @@ public class ImmInputField : Selectable,
 
     void OnApplicationFocus(bool focus)
     {
+#if TMP_DEBUG_MODE
+        Debug.Log("OnApplicationFocus " + focus.ToString());
+#endif
+
         if (!focus)
         {
             if (m_SoftKeyboard != null)
