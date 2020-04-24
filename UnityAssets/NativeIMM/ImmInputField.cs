@@ -3425,6 +3425,12 @@ public class ImmInputField : Selectable,
     {
         if (caretPosition <= textInfo.lineInfo[lineIndex].firstCharacterIndex)
         {
+            // Special case on an empty string with just one '\0' in it. It seems to ignore the RTL setting
+            // when being rendered, so the top right corner will be offset and outside the mask area.
+            // TODO The same problem arises when selecting the first char of a line, but it's much less noticeable.
+            if (textInfo.characterCount == 1)
+                return textInfo.characterInfo[caretPosition].origin;
+
             var character = textInfo.characterInfo[caretPosition];
             return rtl ? character.topRight.x : character.origin; // origin in RTL text is on left side anyway, so it's useless
         }
