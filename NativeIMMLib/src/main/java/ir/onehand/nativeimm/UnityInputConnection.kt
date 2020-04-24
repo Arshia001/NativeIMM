@@ -77,7 +77,8 @@ class UnityInputConnection(
         }
     }
 
-    private val imm = targetView.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+    private val imm =
+        targetView.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
 
     private var batchEditCount = 0
     private var textChanged = false
@@ -428,9 +429,25 @@ class UnityInputConnection(
         return false
     }
 
+    private fun isPrintable(codePoint: Int): Boolean {
+        val block = Character.UnicodeBlock.of(codePoint)
+        return !Character.isISOControl(codePoint) && block != null && block !== Character.UnicodeBlock.SPECIALS
+    }
+
     override fun sendKeyEvent(event: KeyEvent): Boolean {
         if (UnityInterop.isDebugMode)
             Log.i(LOG_TAG, "sendKeyEvent $event")
+
+        if (event.action == KeyEvent.ACTION_UP) {
+            val codePoint = event.unicodeChar
+            if (isPrintable(codePoint)) {
+                if (UnityInterop.isDebugMode)
+                    Log.i(LOG_TAG, "received alphanumeric character $codePoint in key event")
+
+                replaceText(codePoint.toChar().toString(), 1, false)
+                return true
+            }
+        }
 
         return false
     }
