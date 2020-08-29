@@ -446,6 +446,8 @@ class UnityInputConnection(
 
                 replaceText(codePoint.toChar().toString(), 1, false)
                 return true
+            } else if (event.keyCode == KeyEvent.KEYCODE_DEL) {
+                deleteSurroundingText(1, 0)
             }
         }
 
